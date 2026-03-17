@@ -1,0 +1,340 @@
+import * as cdk from 'aws-cdk-lib';
+import {
+  aws_logs,
+  aws_s3,
+  aws_iam,
+  aws_ec2,
+  aws_lambda,
+  aws_fsx,
+  aws_sagemaker,
+} from 'aws-cdk-lib';
+import { Construct } from 'constructs';
+import { Configuration } from '../types/configurations';
+import * as path from 'path';
+
+export interface HyperPodProps {
+  config: Configuration;
+  vpc: aws_ec2.IVpc;
+  privateSubnet: aws_ec2.PrivateSubnet;
+  lfsSecurityGroup: aws_ec2.SecurityGroup;
+  lfs: aws_fsx.LustreFileSystem;
+}
+
+export class HyperPod extends Construct {
+  constructor(scope: Construct, id: string, props: HyperPodProps) {
+    super(scope, id);
+
+    const lifeCycleScriptBucket = new aws_s3.Bucket(this, 'LifeCycleScript', {
+      accessControl: aws_s3.BucketAccessControl.PRIVATE,
+      blockPublicAccess: aws_s3.BlockPublicAccess.BLOCK_ALL,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+      encryption: aws_s3.BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+    });
+
+    new cdk.CfnOutput(this, 'LifeCycleScriptBucketName', {
+      value: lifeCycleScriptBucket.bucketName,
+      description: 'Life Cycle scripts Bucket',
+    });
+
+    // Custom resource to download lifecycle scripts from github
+    // https://github.com/aws-samples/awsome-distributed-training/tree/main/1.architectures/5.sagemaker-hyperpod/LifecycleScripts/base-config
+    const loadLifeCycleScriptLogGroup = new aws_logs.LogGroup(this, 'LoadLifeCycleScriptLogGroup', {
+      retention: aws_logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const loadLifeCycleScriptFunctionRole = new aws_iam.Role(
+      this,
+      'LoadLifeCycleScriptFunctionRole',
+      {
+        assumedBy: new aws_iam.ServicePrincipal('lambda.amazonaws.com'),
+      },
+    );
+    loadLifeCycleScriptLogGroup.grantWrite(loadLifeCycleScriptFunctionRole);
+    lifeCycleScriptBucket.grantReadWrite(loadLifeCycleScriptFunctionRole);
+
+    const loadLifeCycleScriptFunction = new aws_lambda.Function(
+      this,
+      'LoadLifeCycleScriptFunction',
+      {
+        runtime: aws_lambda.Runtime.PYTHON_3_14,
+        memorySize: 1024,
+        handler: 'index.handler',
+        role: loadLifeCycleScriptFunctionRole,
+        code: aws_lambda.Code.fromAsset(
+          path.join(__dirname, '../lambda/custom-resources/lifecycle-loader'),
+        ),
+        timeout: cdk.Duration.minutes(15),
+        logGroup: loadLifeCycleScriptLogGroup,
+        environment: {
+          BUCKET_NAME: lifeCycleScriptBucket.bucketName,
+          BUCKET_PATH: '',
+          GITHUB_BRANCH: 'main',
+          GITHUB_PATH: '1.architectures/5.sagemaker-hyperpod/LifecycleScripts/base-config',
+          GITHUB_REPO_URL: 'https://github.com/aws-samples/awsome-distributed-training',
+        },
+      },
+    );
+    const loadLifeCycleScriptResource = new cdk.CustomResource(
+      this,
+      'LoadLifeCycleScriptResource',
+      {
+        serviceToken: loadLifeCycleScriptFunction.functionArn,
+        resourceType: 'Custom::LoadLifeCycleScript',
+      },
+    );
+    loadLifeCycleScriptResource.node.addDependency(lifeCycleScriptBucket);
+
+    // Custom resource to create provisioning_parameters.json
+    const updateProvisioningParameterLogGroup = new aws_logs.LogGroup(
+      this,
+      'UpdateProvisioningParameterLogGroup',
+      {
+        retention: aws_logs.RetentionDays.ONE_MONTH,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      },
+    );
+
+    const updateProvisioningParameterFunctionRole = new aws_iam.Role(
+      this,
+      'UpdateProvisioningParameterFunctionRole',
+      {
+        assumedBy: new aws_iam.ServicePrincipal('lambda.amazonaws.com'),
+      },
+    );
+    updateProvisioningParameterLogGroup.grantWrite(updateProvisioningParameterFunctionRole);
+    lifeCycleScriptBucket.grantWrite(updateProvisioningParameterFunctionRole);
+
+    const updateProvisioningParamsFunction = new aws_lambda.Function(
+      this,
+      'UpdateProvisioningParamsFunction',
+      {
+        runtime: aws_lambda.Runtime.PYTHON_3_14,
+        handler: 'index.handler',
+        role: updateProvisioningParameterFunctionRole,
+        code: aws_lambda.Code.fromAsset(
+          path.join(__dirname, '../lambda/custom-resources/slurm-parameter'),
+        ),
+        timeout: cdk.Duration.minutes(5),
+        logGroup: updateProvisioningParameterLogGroup,
+      },
+    );
+
+    const updateProvisioningParamsResource = new cdk.CustomResource(
+      this,
+      'UpdateProvisioningParamsResource',
+      {
+        serviceToken: updateProvisioningParamsFunction.functionArn,
+        resourceType: 'Custom::CreateProvisioningParameter',
+        properties: {
+          BucketName: lifeCycleScriptBucket.bucketName,
+          ControllerGroupName: props.config.Cluster.ControllerGroup.Name,
+          WorkerGroup: props.config.Cluster.WorkerGroup,
+          LoginGroupName: props.config.Cluster.LoginGroup.Name,
+          FsxDnsName: props.lfs.dnsName,
+          FsxMountName: props.lfs.mountName,
+        },
+      },
+    );
+    // Ensure provisioning_parameters.json is created after bucket deployment
+    updateProvisioningParamsResource.node.addDependency(loadLifeCycleScriptResource);
+
+    // Cluster
+    const clusterLogsGroup = new aws_logs.LogGroup(this, 'LogGroup', {
+      retention: aws_logs.RetentionDays.ONE_MONTH,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
+    const interfacePolicy = new aws_iam.PolicyDocument({
+      statements: [
+        new aws_iam.PolicyStatement({
+          actions: [
+            'ec2:DescribeNetworkInterfaces',
+            'ec2:DescribeVpcs',
+            'ec2:DescribeDhcpOptions',
+            'ec2:DescribeSubnets',
+            'ec2:DescribeSecurityGroups',
+            'ec2:CreateNetworkInterface',
+            'ec2:CreateNetworkInterfacePermission',
+            'ec2:CreateTags',
+            'ec2:DetachNetworkInterface',
+            'ec2:DeleteNetworkInterface',
+            'ec2:DeleteNetworkInterfacePermission',
+          ],
+          resources: ['*'],
+        }),
+      ],
+    });
+    const clusterPolicy = new aws_iam.PolicyDocument({
+      statements: [
+        new aws_iam.PolicyStatement({
+          actions: [
+            'sagemaker:DeleteCluster',
+            'sagemaker:DescribeCluster',
+            'sagemaker:DescribeClusterNode',
+            'sagemaker:ListClusterNodes',
+            'sagemaker:UpdateCluster',
+            'sagemaker:UpdateClusterSoftware',
+            'sagemaker:BatchDeleteClusterNodes',
+          ],
+          resources: [
+            `arn:aws:sagemaker:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:cluster/*`,
+          ],
+        }),
+        new aws_iam.PolicyStatement({
+          actions: ['sagemaker:ListClusters', 'cloudformation:DescribeStacks'],
+          resources: ['*'],
+        }),
+      ],
+    });
+    const ecrPolicy = new aws_iam.PolicyDocument({
+      statements: [
+        new aws_iam.PolicyStatement({
+          actions: [
+            'ecr:CreateRepository',
+            'ecr:BatchCheckLayerAvailability',
+            'ecr:GetDownloadUrlForLayer',
+            'ecr:GetRepositoryPolicy',
+            'ecr:DescribeRepositories',
+            'ecr:ListImages',
+            'ecr:DescribeImages',
+            'ecr:BatchGetImage',
+            'ecr:InitiateLayerUpload',
+            'ecr:UploadLayerPart',
+            'ecr:CompleteLayerUpload',
+            'ecr:PutImage',
+          ],
+          resources: [
+            `arn:aws:ecr:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:repository/*`,
+          ],
+        }),
+        new aws_iam.PolicyStatement({
+          actions: ['ecr:GetAuthorizationToken'],
+          resources: ['*'],
+        }),
+      ],
+    });
+    const clusterExecutionRole = new aws_iam.Role(this, 'ExecutionRole', {
+      assumedBy: new aws_iam.ServicePrincipal('sagemaker.amazonaws.com'),
+      managedPolicies: [
+        aws_iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSageMakerClusterInstanceRolePolicy'),
+      ],
+      inlinePolicies: {
+        AllowInterface: interfacePolicy,
+        AllowClusterUpdate: clusterPolicy,
+        AllowEcrRepositoryPolicy: ecrPolicy,
+      },
+    });
+
+    clusterLogsGroup.grantWrite(clusterExecutionRole);
+    lifeCycleScriptBucket.grantReadWrite(clusterExecutionRole);
+
+    // https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-sagemaker-cluster-clusterinstancegroup.html
+    const loginGroup = {
+      executionRole: clusterExecutionRole.roleArn,
+      instanceCount: props.config.Cluster.LoginGroup.Count,
+      instanceGroupName: props.config.Cluster.LoginGroup.Name,
+      instanceType: props.config.Cluster.LoginGroup.InstanceType,
+      lifeCycleConfig: {
+        onCreate: 'on_create.sh',
+        sourceS3Uri: `s3://${lifeCycleScriptBucket.bucketName}`,
+      },
+      instanceStorageConfigs: [
+        {
+          ebsVolumeConfig: {
+            rootVolume: false,
+            volumeSizeInGb: 500,
+          },
+        },
+      ],
+      overrideVpcConfig: {
+        securityGroupIds: [props.lfsSecurityGroup.securityGroupId],
+        subnets: [props.privateSubnet.subnetId],
+      },
+      threadsPerCore: 2,
+    };
+    const controllerGroup = {
+      executionRole: clusterExecutionRole.roleArn,
+      instanceCount: props.config.Cluster.ControllerGroup.Count,
+      instanceGroupName: props.config.Cluster.ControllerGroup.Name,
+      instanceType: props.config.Cluster.ControllerGroup.InstanceType,
+      lifeCycleConfig: {
+        onCreate: 'on_create.sh',
+        sourceS3Uri: `s3://${lifeCycleScriptBucket.bucketName}`,
+      },
+      instanceStorageConfigs: [
+        {
+          ebsVolumeConfig: {
+            rootVolume: false,
+            volumeSizeInGb: 500,
+          },
+        },
+      ],
+      overrideVpcConfig: {
+        securityGroupIds: [props.lfsSecurityGroup.securityGroupId],
+        subnets: [props.privateSubnet.subnetId],
+      },
+      threadsPerCore: 2,
+    };
+
+    const workerGroup = props.config.Cluster.WorkerGroup.map((value, index) => ({
+      executionRole: clusterExecutionRole.roleArn,
+      instanceCount: value.Count,
+      instanceGroupName: value.Name,
+      instanceType: value.InstanceType,
+      lifeCycleConfig: {
+        onCreate: 'on_create.sh',
+        sourceS3Uri: `s3://${lifeCycleScriptBucket.bucketName}`,
+      },
+      instanceStorageConfigs: [
+        {
+          ebsVolumeConfig: {
+            rootVolume: false,
+            volumeSizeInGb: 500,
+          },
+        },
+      ],
+      overrideVpcConfig: {
+        securityGroupIds: [props.lfsSecurityGroup.securityGroupId],
+        subnets: [props.privateSubnet.subnetId],
+      },
+      threadsPerCore: 2,
+    }));
+
+    const cfnCluster = new aws_sagemaker.CfnCluster(this, 'Model', {
+      clusterName: props.config.Cluster.Name,
+      instanceGroups: [loginGroup, controllerGroup, ...workerGroup],
+      nodeRecovery: 'Automatic',
+      vpcConfig: {
+        securityGroupIds: [props.lfsSecurityGroup.securityGroupId],
+        subnets: [props.privateSubnet.subnetId],
+      },
+    });
+
+    // Ensure cluster is created after provisioning_parameters.json is uploaded
+    cfnCluster.node.addDependency(updateProvisioningParamsResource);
+
+    new cdk.CfnOutput(this, 'ClusterId', {
+      value: props.config.Cluster.Name,
+      description: 'SageMaker HyperPod cluster name',
+    });
+    new cdk.CfnOutput(this, 'LoginGroupName', {
+      value: props.config.Cluster.LoginGroup.Name,
+      description: 'SageMaker HyperPod login group node name',
+    });
+    new cdk.CfnOutput(this, 'ClusterExecutionRoleARN', {
+      value: clusterExecutionRole.roleArn,
+      description: 'Role ARN for group',
+    });
+    new cdk.CfnOutput(this, 'ClusterSecurityGroup', {
+      value: props.lfsSecurityGroup.securityGroupId,
+      description: 'Security group attached to the instance',
+    });
+    new cdk.CfnOutput(this, 'ClusterSubnet', {
+      value: props.privateSubnet.subnetId,
+      description: 'Subnet Id to launch the node',
+    });
+  }
+}

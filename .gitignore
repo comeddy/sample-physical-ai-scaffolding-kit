@@ -1,0 +1,21 @@
+*.js
+!jest.config.js
+*.d.ts
+node_modules
+
+# CDK asset staging directory
+.DS_Store
+cdk.out
+*.cdk-outputs.json
+hyperpod/cdk.context.json
+easy-ssh.sh
+provisioning_parameters.json
+
+# python
+__pycache__/
+*.venv*
+
+# openpi
+samples/openpi-sample/openpi
+*.cache
+samples/openpi-sample.zip

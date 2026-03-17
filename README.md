@@ -1,17 +1,9 @@
-## My Project
+# Physical Ai Scaffolding Kit
 
-TODO: Fill this README out!
+[フィジカル AI 開発支援プログラム by AWS ジャパン](https://aws.amazon.com/jp/blogs/news/aws-japan-physical-ai-development-support-program/) 向けのサンプルリポジトリ
 
-Be sure to:
+このリポジトリには以下のサンプルを含みます。
 
-* Change the title in this README
-* Edit your repository description on GitHub
-
-## Security
-
-See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
-
-## License
-
-This library is licensed under the MIT-0 License. See the LICENSE file.
-
+1. [Amazon SageMaker HyperPodを使ったSlurmクラスタ](/hyperpod/README.md)
+2. [π0 サンプル](samples/openpi-sample/README.md)
+3. [NVIDIA Isaac GROOT サンプル](/samples/groot/README.md)
