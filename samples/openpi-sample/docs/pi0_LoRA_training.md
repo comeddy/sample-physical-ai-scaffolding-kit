@@ -29,9 +29,7 @@ flowchart TB
 
 ***
 
-## 前提条件
-
-### 環境準備
+## 環境準備
 
 1. **Hyperpod クラスタ**: 本プロジェクト内の CDK を使って Hyperpod クラスタを AWS 上に構築している
 	以下の手順では、CDK で構築されている Hyperpod を前提に記述しますが、コンソールなどから手動で作成した Hyperpod でも同様に学習実行は可能です。
@@ -128,9 +126,9 @@ source ~/.bashrc
 	- /fsx/ubuntu/samples/openpi-sample/logs/
 	- /fsx/ubuntu/samples/openpi-sample/.cache/
 	- /fsx/ubuntu/samples/openpi-sample/openpi/assets/physical-intelligence/libero/
-3. 環境変数を \~/.bashrc に設定 🆕
+3. 環境変数を \~/.bashrc に設定
 	- 既存の OpenPI/Enroot 設定があれば削除（バックアップ作成）
-	- 以下の環境変数を追記：**!重要**これらの環境変数は、すべての Slurm ジョブスクリプトで使用されます。
+	- 以下の環境変数を追記：これらの環境変数は、すべての Slurm ジョブスクリプトで使用されます。
 		* export OPENPI\_BASE\_DIR=/fsx/ubuntu/samples/openpi-sample
 		* export OPENPI\_PROJECT\_ROOT=\${OPENPI\_BASE\_DIR}/openpi
 		* export OPENPI\_DATA\_HOME=\${OPENPI\_BASE\_DIR}/.cache
