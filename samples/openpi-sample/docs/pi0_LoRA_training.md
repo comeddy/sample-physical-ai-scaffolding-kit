@@ -31,12 +31,15 @@ flowchart TB
 
 ## 前提条件
 
-### 必要な認証情報
+### 環境準備
 
 1. **Hyperpod クラスタ**: 本プロジェクト内の CDK を使って Hyperpod クラスタを AWS 上に構築している
 	以下の手順では、CDK で構築されている Hyperpod を前提に記述しますが、コンソールなどから手動で作成した Hyperpod でも同様に学習実行は可能です。
-2. **AWS 認証情報設定された開発環境**: ECR アクセス用
-3. **Hugging Face トークン**: データセットダウンロード用 (`HF_TOKEN`)
+2. **開発環境**: 以下の設定が必要になります。
+	1. AWS 認証情報設定: ECR アクセス用
+	2. Docker: pi0 学習用イメージのBuild用
+3. **Hugging Face トークン**: サンプル学習データセットダウンロード用 (`HF_TOKEN`)
+	1. [Hugging Face](https://huggingface.co/settings/tokens) での事前 Sign Up とToken の払い出しが必要です。独自の学習データを使用する場合は不要です。
 
 ***
 
