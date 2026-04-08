@@ -8,7 +8,7 @@ import { Aspects } from 'aws-cdk-lib';
 const app = new cdk.App();
 const config = app.node.tryGetContext('config') as Configuration;
 
-// Nagによるチェックを有効にする場合、コメントを外す
+// Nag 검사를 활성화하려면 아래 주석을 해제하세요
 // Aspects.of(app).add(new AwsSolutionsChecks({ verbose: true }));
 
 new PASKStack(app, config.StackName, {

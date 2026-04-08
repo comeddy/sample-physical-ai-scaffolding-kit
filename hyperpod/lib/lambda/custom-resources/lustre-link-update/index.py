@@ -38,7 +38,7 @@ def send_cfn_response(
         "Reason": reason
         or f"See the details in CloudWatch Log Stream: {context.log_stream_name}",
         "PhysicalResourceId": physical_resource_id
-        or context.log_stream_name,  # Noneの場合はlog_stream_nameをフォールバックとして使用
+        or context.log_stream_name,  # None인 경우 log_stream_name을 폴백으로 사용
         "StackId": event["StackId"],
         "RequestId": event["RequestId"],
         "LogicalResourceId": event["LogicalResourceId"],
@@ -114,7 +114,7 @@ def handle_create(event, context):
 def handle_delete(event, context):
     try:
         association_id = event.get("PhysicalResourceId")
-        # Create失敗時はlog_stream_nameがPhysicalResourceIdになるためスキップ
+        # Create 실패 시 log_stream_name이 PhysicalResourceId가 되므로 스킵
         if not association_id or association_id == context.log_stream_name:
             return True, "No association to delete."
 

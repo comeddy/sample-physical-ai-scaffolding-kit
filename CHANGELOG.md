@@ -2,4 +2,4 @@
 
 [0.0.1] Preview
 
-- Amazon SageMaker HyperPodの環境構築に必要なcdkのサンプル
+- Amazon SageMaker HyperPod 환경 구축에 필요한 CDK 샘플
