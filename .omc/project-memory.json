@@ -1,0 +1,160 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1775632545510,
+  "projectRoot": "/Users/youngjik/Documents/GitHub/sample-physical-ai-scaffolding-kit",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "hyperpod": {
+      "path": "hyperpod",
+      "purpose": null,
+      "fileCount": 6,
+      "lastAccessed": 1775632545409,
+      "keyFiles": [
+        "README.md",
+        "cdk.json",
+        "package-lock.json",
+        "package.json",
+        "tsconfig.json"
+      ]
+    },
+    "samples": {
+      "path": "samples",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1775632545413,
+      "keyFiles": []
+    },
+    "hyperpod/bin": {
+      "path": "hyperpod/bin",
+      "purpose": "Executable scripts",
+      "fileCount": 1,
+      "lastAccessed": 1775632545422,
+      "keyFiles": [
+        "cdk.ts"
+      ]
+    },
+    "hyperpod/docs": {
+      "path": "hyperpod/docs",
+      "purpose": "Documentation",
+      "fileCount": 3,
+      "lastAccessed": 1775632545437,
+      "keyFiles": [
+        "CLEANUP.md",
+        "DEPLOYMENT.md",
+        "architecture.png"
+      ]
+    },
+    "hyperpod/lib": {
+      "path": "hyperpod/lib",
+      "purpose": "Library code",
+      "fileCount": 1,
+      "lastAccessed": 1775632545445,
+      "keyFiles": [
+        "pask-stack.ts"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "",
+      "accessCount": 4,
+      "lastAccessed": 1775633304673,
+      "type": "directory"
+    },
+    {
+      "path": "hyperpod/lib/lambda/custom-resources/lustre-link-update/index.py",
+      "accessCount": 4,
+      "lastAccessed": 1775633386316,
+      "type": "directory"
+    },
+    {
+      "path": "samples/gr00t/docs/training.md",
+      "accessCount": 3,
+      "lastAccessed": 1775633622591,
+      "type": "directory"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 2,
+      "lastAccessed": 1775633368656,
+      "type": "file"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "accessCount": 2,
+      "lastAccessed": 1775633370901,
+      "type": "file"
+    },
+    {
+      "path": "hyperpod/README.md",
+      "accessCount": 2,
+      "lastAccessed": 1775633379865,
+      "type": "file"
+    },
+    {
+      "path": "hyperpod/bin/cdk.ts",
+      "accessCount": 2,
+      "lastAccessed": 1775633381554,
+      "type": "file"
+    },
+    {
+      "path": "samples/openpi-sample/README.md",
+      "accessCount": 2,
+      "lastAccessed": 1775633392291,
+      "type": "file"
+    },
+    {
+      "path": "samples/gr00t/README.md",
+      "accessCount": 2,
+      "lastAccessed": 1775633395683,
+      "type": "file"
+    },
+    {
+      "path": "hyperpod/docs/CLEANUP.md",
+      "accessCount": 2,
+      "lastAccessed": 1775633407723,
+      "type": "file"
+    },
+    {
+      "path": "hyperpod/docs/DEPLOYMENT.md",
+      "accessCount": 2,
+      "lastAccessed": 1775633503562,
+      "type": "file"
+    },
+    {
+      "path": "samples/openpi-sample/docs/pi0_LoRA_training.md",
+      "accessCount": 2,
+      "lastAccessed": 1775633574898,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}
